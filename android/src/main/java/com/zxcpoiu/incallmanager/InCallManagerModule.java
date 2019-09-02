@@ -286,7 +286,7 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
                             deviceName = "";
                         }
                         WritableMap data = Arguments.createMap();
-                        data.putBoolean("isPlugged", true);
+                        data.putBoolean("isPlugged", (intent.getIntExtra("state", 0) == 1) ? true : false);
                         data.putBoolean("hasMic", (intent.getIntExtra("microphone", 0) == 1) ? true : false);
                         data.putString("deviceName", deviceName);
                         sendEvent("WiredHeadset", data);

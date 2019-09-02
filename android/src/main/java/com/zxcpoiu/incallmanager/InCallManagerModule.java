@@ -277,7 +277,8 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
             wiredHeadsetReceiver = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    if (ACTION_HEADSET_PLUG.equals(intent.getAction())) {
+                    boolean isHeadsetPluggedIn = (intent.getIntExtra("state", 0) == 1) ? true : false;
+                    if (ACTION_HEADSET_PLUG.equals(intent.getAction()) && isHeadsetPluggedIn) {
                         hasWiredHeadset = true;
                         updateAudioRoute();
                         String deviceName = intent.getStringExtra("name");
@@ -285,12 +286,13 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
                             deviceName = "";
                         }
                         WritableMap data = Arguments.createMap();
-                        data.putBoolean("isPlugged", (intent.getIntExtra("state", 0) == 1) ? true : false);
+                        data.putBoolean("isPlugged", true);
                         data.putBoolean("hasMic", (intent.getIntExtra("microphone", 0) == 1) ? true : false);
                         data.putString("deviceName", deviceName);
                         sendEvent("WiredHeadset", data);
                     } else {
                         hasWiredHeadset = false;
+                        updateAudioRoute();
                     }
                 }
             };
@@ -772,8 +774,6 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
         // --- Note: in some devices, it may not contains specified route thus will not be effected.
         if (flag == 1) {
             selectAudioDevice(AudioDevice.SPEAKER_PHONE);
-        } else if (flag == -1) {
-            selectAudioDevice(AudioDevice.EARPIECE); // --- use the most common earpiece to force `speaker off`
         } else {
             selectAudioDevice(AudioDevice.NONE); // --- NONE will follow default route, the default route of `video` call is speaker.
         }

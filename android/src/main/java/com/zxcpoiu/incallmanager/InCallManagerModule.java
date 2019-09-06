@@ -576,8 +576,6 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
             requestAudioFocus();
             startEvents();
             bluetoothManager.start();
-            // TODO: even if not acquired focus, we can still play sounds. but need figure out which is better.
-            getCurrentActivity().setVolumeControlStream(AudioManager.STREAM_VOICE_CALL);
             audioManager.setMode(defaultAudioMode);
             setSpeakerphoneOn(defaultSpeakerOn);
             setMicrophoneMute(false);
@@ -588,7 +586,9 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
             selectedAudioDevice = AudioDevice.NONE;
             audioDevices.clear();
             updateAudioRoute();
-
+            if(getCurrentActivity() != null){
+                getCurrentActivity().setVolumeControlStream(AudioManager.STREAM_VOICE_CALL);
+            }
             if (!ringbackUriType.isEmpty()) {
                 startRingback(ringbackUriType);
             }

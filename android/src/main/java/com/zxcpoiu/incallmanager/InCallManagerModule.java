@@ -1854,22 +1854,25 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
         Log.d(TAG, "--- updateAudioDeviceState done");
     }
 
-    private WritableMap getAudioDeviceStatusMap() {
+    private synchronized WritableMap getAudioDeviceStatusMap() {
         WritableMap data = Arguments.createMap();
-        String audioDevicesJson = "[";
-        for (AudioDevice s: audioDevices) {
-            audioDevicesJson += "\"" + s.name() + "\",";
+        try {
+            String audioDevicesJson = "[";
+            for (AudioDevice s: audioDevices) {
+                audioDevicesJson += "\"" + s.name() + "\",";
+            }
+
+            // --- strip the last `,`
+            if (audioDevicesJson.length() > 1) {
+                audioDevicesJson = audioDevicesJson.substring(0, audioDevicesJson.length() - 1);
+            }
+            audioDevicesJson += "]";
+
+            data.putString("availableAudioDeviceList", audioDevicesJson);
+            data.putString("selectedAudioDevice", (selectedAudioDevice == null) ? "" : selectedAudioDevice.name());
+        } catch (Exception e) {
+
         }
-
-        // --- strip the last `,`
-        if (audioDevicesJson.length() > 1) {
-            audioDevicesJson = audioDevicesJson.substring(0, audioDevicesJson.length() - 1);
-        }
-        audioDevicesJson += "]";
-
-        data.putString("availableAudioDeviceList", audioDevicesJson);
-        data.putString("selectedAudioDevice", (selectedAudioDevice == null) ? "" : selectedAudioDevice.name());
-
         return data;
     }
 

@@ -276,7 +276,8 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
             wiredHeadsetReceiver = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    if (ACTION_HEADSET_PLUG.equals(intent.getAction())) {
+                    boolean isHeadsetPluggedIn = (intent.getIntExtra("state", 0) == 1) ? true : false;
+                    if (ACTION_HEADSET_PLUG.equals(intent.getAction()) && isHeadsetPluggedIn) {
                         hasWiredHeadset = true;
                         updateAudioRoute();
                         String deviceName = intent.getStringExtra("name");
@@ -290,6 +291,7 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
                         sendEvent("WiredHeadset", data);
                     } else {
                         hasWiredHeadset = false;
+                        updateAudioRoute();
                     }
                 }
             };
@@ -573,19 +575,19 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
             requestAudioFocus();
             startEvents();
             bluetoothManager.start();
-            // TODO: even if not acquired focus, we can still play sounds. but need figure out which is better.
-            getCurrentActivity().setVolumeControlStream(AudioManager.STREAM_VOICE_CALL);
             audioManager.setMode(defaultAudioMode);
             setSpeakerphoneOn(defaultSpeakerOn);
             setMicrophoneMute(false);
             forceSpeakerOn = 0;
-            hasWiredHeadset = hasWiredHeadset();
+            //hasWiredHeadset = hasWiredHeadset();
             defaultAudioDevice = (defaultSpeakerOn) ? AudioDevice.SPEAKER_PHONE : (hasEarpiece()) ? AudioDevice.EARPIECE : AudioDevice.SPEAKER_PHONE;
             userSelectedAudioDevice = AudioDevice.NONE;
             selectedAudioDevice = AudioDevice.NONE;
             audioDevices.clear();
             updateAudioRoute();
-
+            if(getCurrentActivity() != null){
+                getCurrentActivity().setVolumeControlStream(AudioManager.STREAM_VOICE_CALL);
+            }
             if (!ringbackUriType.isEmpty()) {
                 startRingback(ringbackUriType);
             }
@@ -771,8 +773,6 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
         // --- Note: in some devices, it may not contains specified route thus will not be effected.
         if (flag == 1) {
             selectAudioDevice(AudioDevice.SPEAKER_PHONE);
-        } else if (flag == -1) {
-            selectAudioDevice(AudioDevice.EARPIECE); // --- use the most common earpiece to force `speaker off`
         } else {
             selectAudioDevice(AudioDevice.NONE); // --- NONE will follow default route, the default route of `video` call is speaker.
         }
@@ -1853,22 +1853,25 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
         Log.d(TAG, "--- updateAudioDeviceState done");
     }
 
-    private WritableMap getAudioDeviceStatusMap() {
+    private synchronized WritableMap getAudioDeviceStatusMap() {
         WritableMap data = Arguments.createMap();
-        String audioDevicesJson = "[";
-        for (AudioDevice s: audioDevices) {
-            audioDevicesJson += "\"" + s.name() + "\",";
+        try {
+            String audioDevicesJson = "[";
+            for (AudioDevice s: audioDevices) {
+                audioDevicesJson += "\"" + s.name() + "\",";
+            }
+
+            // --- strip the last `,`
+            if (audioDevicesJson.length() > 1) {
+                audioDevicesJson = audioDevicesJson.substring(0, audioDevicesJson.length() - 1);
+            }
+            audioDevicesJson += "]";
+
+            data.putString("availableAudioDeviceList", audioDevicesJson);
+            data.putString("selectedAudioDevice", (selectedAudioDevice == null) ? "" : selectedAudioDevice.name());
+        } catch (Exception e) {
+
         }
-
-        // --- strip the last `,`
-        if (audioDevicesJson.length() > 1) {
-            audioDevicesJson = audioDevicesJson.substring(0, audioDevicesJson.length() - 1);
-        }
-        audioDevicesJson += "]";
-
-        data.putString("availableAudioDeviceList", audioDevicesJson);
-        data.putString("selectedAudioDevice", (selectedAudioDevice == null) ? "" : selectedAudioDevice.name());
-
         return data;
     }
 

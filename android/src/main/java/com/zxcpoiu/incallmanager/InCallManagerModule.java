@@ -791,7 +791,10 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
     @ReactMethod
     public void setDefaultMode() {
         try {
+            requestAudioFocus();
+            startEvents();
             audioManager.setMode(defaultAudioMode);
+            updateAudioRoute();
         } catch(Exception e) {}
 
     }

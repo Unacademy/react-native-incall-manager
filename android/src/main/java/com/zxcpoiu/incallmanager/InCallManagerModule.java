@@ -788,6 +788,14 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
         }
     }
 
+    @ReactMethod
+    public void setDefaultMode() {
+        try {
+            audioManager.setMode(defaultAudioMode);
+        } catch(Exception e) {}
+
+    }
+
     /** 
      * This is part of start() process. 
      * ringbackUriType must not empty. empty means do not play.

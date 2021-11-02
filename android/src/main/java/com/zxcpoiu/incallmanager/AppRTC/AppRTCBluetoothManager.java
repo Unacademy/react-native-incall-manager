@@ -393,7 +393,15 @@ public class AppRTCBluetoothManager {
   }
 
   protected void unregisterReceiver(BroadcastReceiver receiver) {
-    apprtcContext.unregisterReceiver(receiver);
+    if (apprtcContext != null) {
+      try {
+        apprtcContext.unregisterReceiver(receiver);
+      } catch (final Exception e) {
+        Log.d(TAG, "unregisterReceiver() failed");
+      }
+    } else {
+      Log.d(TAG, "unregisterReceiver() context is null");
+    }
   }
 
   protected boolean getBluetoothProfileProxy(

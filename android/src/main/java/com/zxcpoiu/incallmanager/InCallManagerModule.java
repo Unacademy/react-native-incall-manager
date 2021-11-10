@@ -56,6 +56,7 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 
 import java.lang.Runnable;
 import java.io.File;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
@@ -748,8 +749,16 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
 
     @ReactMethod
     public void setSpeakerphoneOn(final boolean enable) {
+        try {
+            Class audioSystemClass = Class.forName("android.media.AudioSystem");
+            Method setForceUse = audioSystemClass.getMethod("setForceUse", int.class, int.class);
+            int forceSpeaker = enable == true ? 1 : 0;
+            setForceUse.invoke(null, 1, forceSpeaker);
+        } catch (Exception ignored){}
+
         if (enable != audioManager.isSpeakerphoneOn())  {
             Log.d(TAG, "setSpeakerphoneOn(): " + enable);
+            audioManager.setMode(defaultAudioMode);
             audioManager.setSpeakerphoneOn(enable);
         }
     }

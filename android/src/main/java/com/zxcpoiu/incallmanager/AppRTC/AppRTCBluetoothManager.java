@@ -34,6 +34,8 @@ import com.zxcpoiu.incallmanager.InCallManagerModule;
  * AppRTCProximitySensor manages functions related to Bluetoth devices in the
  * AppRTC demo.
  */
+
+@SuppressLint("MissingPermission")
 public class AppRTCBluetoothManager {
   private static final String TAG = "AppRTCBluetoothManager";
 
@@ -224,6 +226,7 @@ public class AppRTCBluetoothManager {
    * Note that the AppRTCAudioManager is also involved in driving this state
    * change.
    */
+
   public void start() {
     Log.d(TAG, "start");
     if (!hasPermission(apprtcContext, android.Manifest.permission.BLUETOOTH)) {

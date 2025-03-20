@@ -33,9 +33,9 @@ import android.os.PowerManager;
 import android.os.Build;
 import android.os.Handler;
 import android.provider.Settings;
-import android.support.annotation.Nullable;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
+import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.Display;
@@ -45,7 +45,6 @@ import android.view.WindowManager;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.LifecycleEventListener;
-import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContext;
@@ -57,6 +56,7 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 
 import java.lang.Runnable;
 import java.io.File;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
@@ -87,7 +87,7 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
     private boolean origIsMicrophoneMute = false;
     private int origAudioMode = AudioManager.MODE_INVALID;
     private boolean defaultSpeakerOn = false;
-    private int defaultAudioMode = AudioManager.MODE_IN_CALL;
+    private int defaultAudioMode = AudioManager.MODE_IN_COMMUNICATION;
     private int forceSpeakerOn = 0;
     private boolean automatic = true;
     private boolean isProximityRegistered = false;
@@ -277,7 +277,8 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
             wiredHeadsetReceiver = new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
-                    if (ACTION_HEADSET_PLUG.equals(intent.getAction())) {
+                    boolean isHeadsetPluggedIn = (intent.getIntExtra("state", 0) == 1) ? true : false;
+                    if (ACTION_HEADSET_PLUG.equals(intent.getAction()) && isHeadsetPluggedIn) {
                         hasWiredHeadset = true;
                         updateAudioRoute();
                         String deviceName = intent.getStringExtra("name");
@@ -291,6 +292,7 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
                         sendEvent("WiredHeadset", data);
                     } else {
                         hasWiredHeadset = false;
+                        updateAudioRoute();
                     }
                 }
             };
@@ -574,19 +576,19 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
             requestAudioFocus();
             startEvents();
             bluetoothManager.start();
-            // TODO: even if not acquired focus, we can still play sounds. but need figure out which is better.
-            //getCurrentActivity().setVolumeControlStream(AudioManager.STREAM_VOICE_CALL);
             audioManager.setMode(defaultAudioMode);
             setSpeakerphoneOn(defaultSpeakerOn);
             setMicrophoneMute(false);
             forceSpeakerOn = 0;
-            hasWiredHeadset = hasWiredHeadset();
+            //hasWiredHeadset = hasWiredHeadset();
             defaultAudioDevice = (defaultSpeakerOn) ? AudioDevice.SPEAKER_PHONE : (hasEarpiece()) ? AudioDevice.EARPIECE : AudioDevice.SPEAKER_PHONE;
             userSelectedAudioDevice = AudioDevice.NONE;
             selectedAudioDevice = AudioDevice.NONE;
             audioDevices.clear();
             updateAudioRoute();
-
+            if(getCurrentActivity() != null){
+                getCurrentActivity().setVolumeControlStream(AudioManager.STREAM_VOICE_CALL);
+            }
             if (!ringbackUriType.isEmpty()) {
                 startRingback(ringbackUriType);
             }
@@ -747,8 +749,16 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
 
     @ReactMethod
     public void setSpeakerphoneOn(final boolean enable) {
+        try {
+            Class audioSystemClass = Class.forName("android.media.AudioSystem");
+            Method setForceUse = audioSystemClass.getMethod("setForceUse", int.class, int.class);
+            int forceSpeaker = enable == true ? 1 : 0;
+            setForceUse.invoke(null, 1, forceSpeaker);
+        } catch (Exception ignored){}
+
         if (enable != audioManager.isSpeakerphoneOn())  {
             Log.d(TAG, "setSpeakerphoneOn(): " + enable);
+            audioManager.setMode(defaultAudioMode);
             audioManager.setSpeakerphoneOn(enable);
         }
     }
@@ -772,8 +782,6 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
         // --- Note: in some devices, it may not contains specified route thus will not be effected.
         if (flag == 1) {
             selectAudioDevice(AudioDevice.SPEAKER_PHONE);
-        } else if (flag == -1) {
-            selectAudioDevice(AudioDevice.EARPIECE); // --- use the most common earpiece to force `speaker off`
         } else {
             selectAudioDevice(AudioDevice.NONE); // --- NONE will follow default route, the default route of `video` call is speaker.
         }
@@ -787,6 +795,17 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
             Log.d(TAG, "setMicrophoneMute(): " + enable);
             audioManager.setMicrophoneMute(enable);
         }
+    }
+
+    @ReactMethod
+    public void setDefaultMode() {
+        try {
+            requestAudioFocus();
+            startEvents();
+            audioManager.setMode(defaultAudioMode);
+            updateAudioRoute();
+        } catch(Exception e) {}
+
     }
 
     /** 
@@ -1854,22 +1873,25 @@ public class InCallManagerModule extends ReactContextBaseJavaModule implements L
         Log.d(TAG, "--- updateAudioDeviceState done");
     }
 
-    private WritableMap getAudioDeviceStatusMap() {
+    private synchronized WritableMap getAudioDeviceStatusMap() {
         WritableMap data = Arguments.createMap();
-        String audioDevicesJson = "[";
-        for (AudioDevice s: audioDevices) {
-            audioDevicesJson += "\"" + s.name() + "\",";
+        try {
+            String audioDevicesJson = "[";
+            for (AudioDevice s: audioDevices) {
+                audioDevicesJson += "\"" + s.name() + "\",";
+            }
+
+            // --- strip the last `,`
+            if (audioDevicesJson.length() > 1) {
+                audioDevicesJson = audioDevicesJson.substring(0, audioDevicesJson.length() - 1);
+            }
+            audioDevicesJson += "]";
+
+            data.putString("availableAudioDeviceList", audioDevicesJson);
+            data.putString("selectedAudioDevice", (selectedAudioDevice == null) ? "" : selectedAudioDevice.name());
+        } catch (Exception e) {
+
         }
-
-        // --- strip the last `,`
-        if (audioDevicesJson.length() > 1) {
-            audioDevicesJson = audioDevicesJson.substring(0, audioDevicesJson.length() - 1);
-        }
-        audioDevicesJson += "]";
-
-        data.putString("availableAudioDeviceList", audioDevicesJson);
-        data.putString("selectedAudioDevice", (selectedAudioDevice == null) ? "" : selectedAudioDevice.name());
-
         return data;
     }
 

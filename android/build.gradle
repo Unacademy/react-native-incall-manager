@@ -22,6 +22,11 @@ android {
     }
 }
 
+repositories {
+    mavenCentral()
+    google()
+}
+
 dependencies {
     implementation 'com.facebook.react:react-native:+'
     implementation "androidx.media:media:1.4.3"
